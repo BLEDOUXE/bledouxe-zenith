@@ -195,7 +195,8 @@
 
 <div id="loader">
   <img src="assets/logo.png" alt="">
-  <div class="loader-text">Initialisation du voyage…</div>
+  <div class="loader-text" id="loaderText">Initialisation du voyage…</div>
+  <div id="loaderError" style="display:none;max-width:80vw;text-align:center;color:#ff6a6a;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:0.05em;line-height:1.5;margin-top:0.5rem;"></div>
 </div>
 
 <div class="topbar">
@@ -238,6 +239,61 @@
 </div>
 
 <div class="skip-link" id="skipLink">Passer l'intro →</div>
+
+<script>
+  // Filet de sécurité : si le voyage 3D ne démarre pas (fichier manquant, mauvais nom, etc.),
+  // on affiche un message clair au lieu de rester bloqué sur "Initialisation..." indéfiniment.
+  const REQUIRED_FILES = [
+    'assets/three.module.min.js',
+    'assets/logo.png',
+    'assets/logo-transparent.png',
+    'assets/vert.png',
+    'assets/beige.png',
+    'assets/noir.png'
+  ];
+  let journeyStarted = false;
+  window.addEventListener('bz-journey-started', () => {
+    journeyStarted = true;
+    const box = document.getElementById('loaderError');
+    if(box) box.style.display = 'none';
+  });
+
+  function showLoaderError(msg){
+    if(journeyStarted) return;
+    const box = document.getElementById('loaderError');
+    const txt = document.getElementById('loaderText');
+    if(txt) txt.textContent = 'Chargement impossible';
+    if(box){
+      box.style.display = 'block';
+      box.innerHTML = msg;
+    }
+  }
+
+  const RELEVANT_NAMES = ['three.module.min.js','logo.png','logo-transparent.png','vert.png','beige.png','noir.png','commander.html'];
+
+  window.addEventListener('error', (e) => {
+    if(journeyStarted) return;
+    const src = e.filename || (e.target && e.target.src) || '';
+    const fileName = src.split('/').pop().split('?')[0];
+    // on ignore les erreurs qui ne concernent pas nos propres fichiers (ex: polices externes)
+    if(src && !RELEVANT_NAMES.includes(fileName)) return;
+    showLoaderError(
+      'Impossible de charger un fichier' + (src ? (' : <br><span style="color:#9ecbff">' + src.split('/').slice(-2).join('/') + '</span>') : '.') +
+      '<br><br>Vérifie sur GitHub que ces fichiers existent bien, avec exactement ces noms, dans le dossier <b>assets</b> :<br>' +
+      REQUIRED_FILES.map(f => f.replace('assets/','')).join(' · ')
+    );
+  }, true);
+
+  setTimeout(() => {
+    if(!journeyStarted){
+      showLoaderError(
+        'Le chargement prend trop de temps — un fichier est probablement manquant ou mal nommé.<br><br>' +
+        'Vérifie sur GitHub que ces fichiers existent bien, avec exactement ces noms, dans le dossier <b>assets</b> :<br>' +
+        REQUIRED_FILES.map(f => f.replace('assets/','')).join(' · ')
+      );
+    }
+  }, 7000);
+</script>
 
 <script type="module">
 import * as THREE from './assets/three.module.min.js';
@@ -868,6 +924,7 @@ function animate(){
 /* ============================================================
    BOOT
    ============================================================ */
+window.dispatchEvent(new Event('bz-journey-started'));
 setTimeout(() => {
   document.getElementById('loader').classList.add('hidden');
 }, 900);
