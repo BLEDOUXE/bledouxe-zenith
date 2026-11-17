@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tabouret pliant 3D</title>
+<style>
+:root{--bg1:#eef1ee;--bg2:#cfd6d0;--ink:#1f2723;--mute:#5f6d67;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#2b3330;--bg2:#121715;--ink:#e9efec;--mute:#9fb0aa}}
+:root[data-theme="dark"]{--bg1:#2b3330;--bg2:#121715;--ink:#e9efec;--mute:#9fb0aa}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(circle at 50% 40%,var(--bg1),var(--bg2));color:var(--ink);font-family:"Avenir Next",system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#c:active{cursor:grabbing}
+header{position:fixed;left:20px;top:calc(env(safe-area-inset-top,0px) + 16px);pointer-events:none}
+h1{margin:0;font-size:1.15rem;font-weight:600}
+p{margin:2px 0 0;font-size:.85rem;color:var(--mute)}
+footer{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);text-align:center;font-size:.8rem;color:var(--mute);pointer-events:none}
+#sw{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 52px);display:flex;justify-content:center;gap:14px}
+#sw button{width:38px;height:38px;border-radius:50%;border:2px solid var(--mute);padding:0;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+#sw button.on{border-color:var(--ink);box-shadow:0 0 0 3px var(--bg1),0 0 0 5px var(--ink)}
+#trBtn{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 16px);padding:8px 14px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg1);font:inherit;font-size:.85rem;cursor:pointer}
+</style>
+<style>html,body{background:transparent!important}header,#sw{display:none!important}#trBtn{top:auto!important;bottom:10px;right:10px}</style>
+</head>
+<body>
+<canvas id="c" aria-label="Modèle 3D du tabouret pliant, faites glisser pour tourner"></canvas>
+<header><h1>Tabouret pliant</h1><p id="sub">Beige</p></header>
+<button id="trBtn">Transformer en sac</button>
+<div id="sw" role="group" aria-label="Choisir la couleur"></div>
+<footer>Glisse pour tourner · pince ou molette pour zoomer</footer>
+<script src="vendor128/three.min.js"></script>
+<script src="vendor128/OrbitControls.js"></script>
+<script>
+(function(){
+var V=THREE.Vector3;
+var cv=document.getElementById('c');
+var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+var scene=new THREE.Scene();
+var camera=new THREE.PerspectiveCamera(35,1,0.1,100);
+camera.position.set(2.6,1.6,3.8);
+
+/* Environnement de reflets */
+var envScene=new THREE.Scene();
+var gc=document.createElement('canvas');gc.width=4;gc.height=256;
+var gx=gc.getContext('2d'),gr=gx.createLinearGradient(0,0,0,256);
+gr.addColorStop(0,'#f2f7fa');gr.addColorStop(.5,'#9fb0b5');gr.addColorStop(.52,'#5a5148');gr.addColorStop(1,'#2b241d');
+gx.fillStyle=gr;gx.fillRect(0,0,4,256);
+envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(gc),side:THREE.BackSide})));
+function panel(w,h,x,y,z,k){var m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(k,k,k),side:THREE.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);envScene.add(m);}
+panel(28,10,-24,16,18,2.2);panel(20,8,26,10,-14,1.8);panel(30,6,0,34,0,2);panel(10,14,30,2,20,1.5);
+scene.environment=new THREE.PMREMGenerator(renderer).fromScene(envScene,0.02).texture;
+var sun=new THREE.DirectionalLight(0xffffff,0.85);sun.position.set(2,6,4);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);sun.shadow.radius=6;sun.shadow.bias=-0.0006;
+var sc=sun.shadow.camera;sc.left=-3.5;sc.right=3.5;sc.top=3.5;sc.bottom=-3.5;sc.near=1;sc.far=20;scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xf1f4f2,0x6b5a48,0.4));
+var ground=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.ShadowMaterial({opacity:0.25}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+function col(h){return new THREE.Color(h).convertSRGBToLinear();}
+function mat(h,r,c){return new THREE.MeshPhysicalMaterial({color:col(h),roughness:r,metalness:0,clearcoat:c||0,clearcoatRoughness:0.4});}
+
+/* Coloris : tabouret + sac */
+var PAL={
+ beige:{n:'Beige',sw:'#cdbf9f',fabric:'#cdbf9f',top:'#d0c3a6',bind:'#ded3bb',zip:'#e6dcc6',bzip:'#bfb08f',metal:'#b49e7d',sleeve:'#a8926f',lining:'#b6a685',sling:'#c4b595'},
+ noir:{n:'Noir',sw:'#232427',fabric:'#18181b',top:'#1b1b1e',bind:'#101012',zip:'#1c1d1f',bzip:'#0f0f11',metal:'#17181b',sleeve:'#0f1013',lining:'#101113',sling:'#16171a',mesh:'#0a0a0b',dot:'#2b2b2f',dark:1},
+ vert:{n:'Vert',sw:'#586a4c',fabric:'#566749',top:'#5b6c4d',bind:'#6c7e5b',zip:'#2a3324',bzip:'#10140d',metal:'#17181b',sleeve:'#0f1013',lining:'#4a5a3e',sling:'#556647',mesh:'#0c0f0a'}
+};
+var seatM=mat('#cdbf9f',0.92,0),zipM=mat('#e6dcc6',0.8,0),liningM=mat('#b6a685',0.95,0),slingM=mat('#c4b595',0.95,0);
+seatM.side=THREE.DoubleSide;slingM.side=THREE.DoubleSide;
+var tubeM=new THREE.MeshPhysicalMaterial({color:col('#b49e7d'),roughness:0.35,metalness:0.3,clearcoat:0.6,clearcoatRoughness:0.25});
+var sleeveM=new THREE.MeshPhysicalMaterial({color:col('#a8926f'),roughness:0.3,metalness:0.4,clearcoat:0.5});
+var blk=mat('#14171a',0.6,0.1),steel=new THREE.MeshStandardMaterial({color:col('#c9ccce'),metalness:1,roughness:0.3});
+var leatherM=mat('#4a382c',0.6,0.1);
+var topM=new THREE.MeshStandardMaterial({roughness:0.92,transparent:true,alphaTest:0.4});
+var bagTopM=new THREE.MeshStandardMaterial({roughness:0.92,transparent:true,alphaTest:0.4});
+function weaveTex(rx,ry){var c=canv(16,16),g=c.getContext('2d');g.fillStyle='#808080';g.fillRect(0,0,16,16);g.fillStyle='#b8b8b8';g.fillRect(0,0,8,8);g.fillRect(8,8,8,8);g.fillStyle='#484848';g.fillRect(8,0,8,8);g.fillRect(0,8,8,8);var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);return t;}
+seatM.bumpMap=weaveTex(36,36);seatM.bumpScale=0.7;slingM.bumpMap=weaveTex(36,36);slingM.bumpScale=0.6;liningM.bumpMap=weaveTex(36,36);liningM.bumpScale=0.6;
+topM.bumpMap=weaveTex(80,72);topM.bumpScale=0.8;bagTopM.bumpMap=weaveTex(160,70);bagTopM.bumpScale=0.8;
+function pillow(w,h,sx,sy,amp){var g=new THREE.PlaneGeometry(w,h,sx,sy),p=g.attributes.position;for(var i=0;i<p.count;i++){var x=p.getX(i)/(w/2),y=p.getY(i)/(h/2);p.setZ(i,amp*(1-x*x)*(1-y*y));}g.computeVertexNormals();return g;}
+var bagZipM=mat('#0f0f11',0.7,0.1);
+var strapM=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.9,side:THREE.DoubleSide});
+
+function slab(w,h,d,r,b,bt){
+  var ww=w-2*b,hh=h-2*b,rr=Math.max(r-b,0.01),x=-ww/2,y=-hh/2,s=new THREE.Shape();
+  s.moveTo(x+rr,y);s.lineTo(x+ww-rr,y);s.quadraticCurveTo(x+ww,y,x+ww,y+rr);
+  s.lineTo(x+ww,y+hh-rr);s.quadraticCurveTo(x+ww,y+hh,x+ww-rr,y+hh);
+  s.lineTo(x+rr,y+hh);s.quadraticCurveTo(x,y+hh,x,y+hh-rr);
+  s.lineTo(x,y+rr);s.quadraticCurveTo(x,y,x+rr,y);
+  var dd=d-2*bt,g=new THREE.ExtrudeGeometry(s,{depth:dd,bevelEnabled:true,bevelThickness:bt,bevelSize:b,bevelSegments:8,curveSegments:24});
+  g.translate(0,0,-dd/2);return g;
+}
+function rrp(p,w,h,r){var x=-w/2,y=-h/2;p.moveTo(x+r,y);p.lineTo(x+w-r,y);p.quadraticCurveTo(x+w,y,x+w,y+r);p.lineTo(x+w,y+h-r);p.quadraticCurveTo(x+w,y+h,x+w-r,y+h);p.lineTo(x+r,y+h);p.quadraticCurveTo(x,y+h,x,y+h-r);p.lineTo(x,y+r);p.quadraticCurveTo(x,y,x+r,y);return p;}
+function ringGeo(w,h,r,t,dp){var s=rrp(new THREE.Shape(),w,h,r);s.holes.push(rrp(new THREE.Path(),w-2*t,h-2*t,Math.max(r-t,0.01)));var g=new THREE.ExtrudeGeometry(s,{depth:dp,bevelEnabled:false,curveSegments:24});g.translate(0,0,-dp/2);return g;}
+
+/* Textures du dessus du tabouret et de la face avant du sac */
+function canv(W,H){var c=document.createElement('canvas');c.width=W;c.height=H;return c;}
+function rrc(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function weave(g,p,W,H){g.strokeStyle=p.dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.035)';g.lineWidth=1;for(var i=0;i<W;i+=3){g.beginPath();g.moveTo(i,0);g.lineTo(i,H);g.stroke();}for(i=0;i<H;i+=3){g.beginPath();g.moveTo(0,i);g.lineTo(W,i);g.stroke();}}
+function dots(g,p,x0,x1,y0,y1){g.save();g.clip();g.fillStyle=p.dot||p.top;for(var y=y0,row=0;y<y1;y+=13,row++)for(var x=x0+(row%2?6.5:0);x<x1;x+=13){g.beginPath();g.ellipse(x,y,3.6,4.6,0,0,6.283);g.fill();}g.restore();}
+function mkTex(c){var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;}
+function topTex(p){
+  var W=1024,H=922,c=canv(W,H),g=c.getContext('2d');
+  rrc(g,0,0,W,H,95);g.save();g.clip();g.fillStyle=p.top;g.fillRect(0,0,W,H);weave(g,p,W,H);
+  var x0=34,x1=W-34,y0=34;
+  function Y(f){return f*H;}
+  /* filet (jusqu'au trait 4) */
+  g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y0);g.lineTo(x1,Y(0.44));g.lineTo(x0,Y(0.262));g.closePath();g.fillStyle=p.mesh||'#15120f';g.fill();
+  dots(g,p,x0,x1,y0,Y(0.46));
+  /* bande de finition entre les traits 3 et 4 */
+  g.beginPath();g.moveTo(x0,Y(0.262));g.lineTo(x1,Y(0.44));g.lineTo(x1,Y(0.483));g.lineTo(x0,Y(0.34));g.closePath();g.fillStyle=p.bind;g.fill();
+  /* les 4 traits relevés sur la photo : bord du filet, bord de la bande, et la double couture */
+  function ln(ay,by){
+    g.lineCap='butt';g.lineWidth=3;g.strokeStyle=p.dark?'rgba(255,255,255,0.14)':'rgba(0,0,0,0.28)';
+    g.beginPath();g.moveTo(x0,Y(ay));g.lineTo(x1,Y(by));g.stroke();
+    g.lineWidth=1.5;g.strokeStyle=p.dark?'rgba(0,0,0,0.55)':'rgba(255,255,255,0.28)';
+    g.beginPath();g.moveTo(x0,Y(ay)+3);g.lineTo(x1,Y(by)+3);g.stroke();
+  }
+  ln(0.262,0.44);ln(0.34,0.483);ln(0.453,0.514);ln(0.476,0.524);
+  g.restore();g.strokeStyle=p.bind;g.lineWidth=26;rrc(g,13,13,W-26,H-26,82);g.stroke();
+  return mkTex(c);
+}
+function bagTex(p){
+  var W=1024,H=450,c=canv(W,H),g=c.getContext('2d');
+  rrc(g,0,0,W,H,70);g.save();g.clip();g.fillStyle=p.top;g.fillRect(0,0,W,H);weave(g,p,W,H);
+  var x0=30,x1=W-30,ya=0.17*H,yb=0.34*H,yE=H-30;
+  g.beginPath();g.moveTo(x0,ya);g.lineTo(x1,yb);g.lineTo(x1,yE);g.lineTo(x0,yE);g.closePath();g.fillStyle=p.mesh||'#15120f';g.fill();
+  dots(g,p,x0,x1,ya-10,yE);
+  g.lineCap='round';g.strokeStyle=p.bind;g.lineWidth=18;g.beginPath();g.moveTo(x0,ya);g.lineTo(x1,yb);g.stroke();
+  g.restore();g.strokeStyle=p.bind;g.lineWidth=24;rrc(g,12,12,W-24,H-24,60);g.stroke();
+  return mkTex(c);
+}
+
+/* ===== Tabouret ===== */
+var stool=new THREE.Group();scene.add(stool);
+function add(geo,m,x,y,z){var o=new THREE.Mesh(geo,m);o.position.set(x,y,z);stool.add(o);return o;}
+var pp=new THREE.Group();pp.position.set(0,0.925,0);stool.add(pp);
+var pouch=new THREE.Group();pouch.position.set(0,-0.925,0);pp.add(pouch);
+function addP(geo,m,x,y,z){var o=new THREE.Mesh(geo,m);o.position.set(x,y,z);pouch.add(o);return o;}
+
+var topShell=addP(slab(1.0,0.9,0.05,0.1,0.04,0.02),seatM,0,0.985,0);topShell.rotation.x=-Math.PI/2;
+var wall=addP(ringGeo(1.0,0.9,0.1,0.025,0.13),seatM,0,0.905,0);wall.rotation.x=-Math.PI/2;
+var tape=addP(ringGeo(0.99,0.89,0.095,0.035,0.008),zipM,0,0.844,0);tape.rotation.x=-Math.PI/2;
+var lin=addP(slab(0.945,0.845,0.006,0.075,0.002,0.002),liningM,0,0.9575,0);lin.rotation.x=-Math.PI/2;
+var sling=addP(new THREE.PlaneGeometry(0.58,0.8),slingM,0,0.945,0);sling.rotation.x=Math.PI/2;
+var top=addP(pillow(0.9,0.81,40,36,0.014),topM,0,1.0115,0);top.rotation.x=-Math.PI/2;
+(function(){
+  var pts=[],hx=0.503,hz=0.453,r=0.1,n=12;
+  [[hx-r,hz-r,0],[-(hx-r),hz-r,Math.PI/2],[-(hx-r),-(hz-r),Math.PI],[hx-r,-(hz-r),Math.PI*1.5]].forEach(function(c){
+    for(var i=0;i<=n;i++){var a=c[2]+i/n*Math.PI/2;pts.push(new V(c[0]+r*Math.cos(a),0.85,c[1]+r*Math.sin(a)));}
+  });
+  addP(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts,true),180,0.011,8,true),zipM,0,0,0);
+})();
+addP(new THREE.BoxGeometry(0.06,0.15,0.012),blk,-0.12,0.84,0.458);
+var ring=addP(new THREE.TorusGeometry(0.03,0.008,12,28),blk,-0.12,0.745,0.462);ring.scale.set(1,0.85,1);
+addP(new THREE.BoxGeometry(0.022,0.07,0.01),blk,-0.2,0.86,0.457);
+addP(new THREE.BoxGeometry(0.06,0.15,0.012),blk,0.12,0.84,-0.458);
+var ring2=addP(new THREE.TorusGeometry(0.03,0.008,12,28),blk,0.12,0.745,-0.462);ring2.scale.set(1,0.85,1);
+addP(new THREE.BoxGeometry(0.17,0.075,0.008),leatherM,0.27,0.905,0.453);
+
+/* Pieds : deux cadres en U articulés qui se croisent en X */
+function frameGeo(a,s){
+  var P=[new V(-a,0.9,-0.353*s),new V(-a,0.02,0.42*s),new V(a,0.02,0.42*s),new V(a,0.9,-0.353*s)],rc=0.1,path=new THREE.CurvePath(),cur=P[0];
+  for(var k=1;k<=2;k++){
+    var dIn=P[k].clone().sub(P[k-1]).normalize(),dOut=P[k+1].clone().sub(P[k]).normalize();
+    var st=P[k].clone().addScaledVector(dIn,-rc),en=P[k].clone().addScaledVector(dOut,rc);
+    path.add(new THREE.LineCurve3(cur,st));path.add(new THREE.QuadraticBezierCurve3(st,P[k],en));cur=en;
+  }
+  path.add(new THREE.LineCurve3(cur,P[3]));
+  return {geo:new THREE.TubeGeometry(path,220,0.02,12,false),P:P};
+}
+var frameRoot=new THREE.Group();frameRoot.position.set(0,0.45,0);pouch.add(frameRoot);
+var frames=[];
+[[0.43,1],[0.39,-1]].forEach(function(f){
+  var a=f[0],s=f[1],fr=frameGeo(a,s),piv=new V(0,0.5,0),g=new THREE.Group();
+  g.position.set(0,0.05,0);frameRoot.add(g);fr.geo.translate(-piv.x,-piv.y,-piv.z);g.add(new THREE.Mesh(fr.geo,tubeM));
+  [[0,1],[3,2]].forEach(function(ix){
+    var p0=fr.P[ix[0]].clone().sub(piv),p1=fr.P[ix[1]].clone().sub(piv),d=p1.clone().sub(p0);
+    [0.14,0.84].forEach(function(t){var sl=new THREE.Mesh(new THREE.CylinderGeometry(0.027,0.027,0.05,16),sleeveM);sl.position.copy(p0.clone().addScaledVector(d,t));sl.quaternion.setFromUnitVectors(new V(0,1,0),d.clone().normalize());g.add(sl);});
+  });
+  if(s===1)[1,-1].forEach(function(k){var rv=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.017,0.11,16),steel);rv.rotation.z=Math.PI/2;rv.position.set(0.41*k,0,0);g.add(rv);});
+  frames.push({g:g,s:s});
+});
+stool.traverse(function(o){if(o.isMesh&&o!==top)o.castShadow=true;});
+
+/* ===== Sac (même pochette, pieds rangés à l'intérieur) ===== */
+var BL=1.9,BH=0.9,bag=new THREE.Group();bag.visible=false;bag.position.set(0,0.45,0);scene.add(bag);
+function addB(geo,m,x,y,z){var o=new THREE.Mesh(geo,m);o.position.set(x,y,z);bag.add(o);return o;}
+addB(slab(BL,BH,0.2,0.16,0.07,0.09),seatM,0,0,0.11);
+addB(slab(BL-0.02,BH-0.02,0.2,0.16,0.07,0.09),seatM,0,0,-0.11);
+addB(ringGeo(BL-0.05,BH-0.05,0.14,0.05,0.07),bagZipM,0,0,0);
+addB(pillow(BL-0.12,(BL-0.12)*450/1024,60,28,0.02),bagTopM,0,0,0.2115);
+addB(new THREE.BoxGeometry(0.025,0.09,0.014),blk,-0.9,-0.12,0.03);
+addB(new THREE.BoxGeometry(0.22,0.095,0.01),leatherM,-0.55,-0.22,-0.2125);
+[-1,1].forEach(function(sx){
+  addB(new THREE.BoxGeometry(0.16,0.13,0.018),blk,sx*(BL/2+0.05),-0.05,0);
+  addB(new THREE.TorusGeometry(0.05,0.011,8,8),blk,sx*(BL/2+0.15),-0.05,0);
+});
+/* Bandoulière : sangle noire, boucle de réglage, mousquetons */
+var sg=new THREE.Group();sg.position.set(0,-0.05,0);bag.add(sg);
+var P0=new V(-1.1,0,0),P1=new V(-0.9,3.9,0),P2=new V(0.9,3.9,0),P3=new V(1.1,0,0);
+function bz(s){var u=1-s;return new V(u*u*u*P0.x+3*u*u*s*P1.x+3*u*s*s*P2.x+s*s*s*P3.x,u*u*u*P0.y+3*u*u*s*P1.y+3*u*s*s*P2.y+s*s*s*P3.y,0);}
+function ribTex(){var c=canv(8,16),g=c.getContext('2d');g.fillStyle='#0f1012';g.fillRect(0,0,8,16);g.fillStyle='#2b2c30';g.fillRect(0,2,8,2);g.fillRect(0,10,8,2);var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;}
+function gripTex(){var c=canv(64,88),g=c.getContext('2d');g.fillStyle='#0c0c0d';g.fillRect(0,0,64,88);g.fillStyle='#2b2c30';for(var r=0;r<6;r++)for(var k=0;k<4;k++){g.beginPath();g.arc(8+k*16,8+r*14,4,0,6.283);g.fill();}return mkTex(c);}
+strapM.map=ribTex();strapM.bumpMap=strapM.map;strapM.bumpScale=0.8;
+var gripM=new THREE.MeshStandardMaterial({map:gripTex(),roughness:0.7,side:THREE.DoubleSide});
+(function(){
+  var N=160,pos=[],uv=[],idx=[],ls=[],len=0,prev=bz(0),i;
+  for(i=0;i<=N;i++){var p=bz(i/N);len+=p.distanceTo(prev);prev=p;ls.push(len);}
+  for(i=0;i<=N;i++){var q=bz(i/N),v=ls[i]/0.03;pos.push(q.x,q.y,-0.045,q.x,q.y,0.045);uv.push(0,v,1,v);if(i<N){var a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2);}}
+  var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();
+  sg.add(new THREE.Mesh(g,strapM));
+  function patch(s){var p=bz(s),t=bz(Math.min(1,s+0.01)).sub(p).normalize(),n=new V(-t.y,t.x,0),m=new THREE.Mesh(new THREE.PlaneGeometry(0.09,0.12),gripM);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V(0,0,1),t,n));m.position.copy(p).addScaledVector(n,0.004);sg.add(m);}
+  patch(0.014);patch(0.986);
+  var bk=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.055,0.03),blk);bk.position.copy(bz(0.05));sg.add(bk);
+  [-1,1].forEach(function(sx){var h=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.12,0.03),blk);h.position.set(sx*1.09,0.03,0);sg.add(h);});
+})();
+bag.traverse(function(o){if(o.isMesh&&o.material!==bagTopM)o.castShadow=true;});
+
+/* Couleurs */
+function setColor(k){
+  var p=PAL[k];
+  seatM.color.copy(col(p.fabric));zipM.color.copy(col(p.zip));tubeM.color.copy(col(p.metal));sleeveM.color.copy(col(p.sleeve));
+  liningM.color.copy(col(p.lining));slingM.color.copy(col(p.sling));bagZipM.color.copy(col(p.bzip));
+  if(topM.map)topM.map.dispose();topM.map=topTex(p);topM.needsUpdate=true;
+  if(bagTopM.map)bagTopM.map.dispose();bagTopM.map=bagTex(p);bagTopM.needsUpdate=true;
+  document.getElementById('sub').textContent=p.n;
+  Array.prototype.forEach.call(document.querySelectorAll('#sw button'),function(b){b.classList.toggle('on',b.dataset.k===k);});
+}
+var keys=Object.keys(PAL),sw=document.getElementById('sw');
+keys.forEach(function(k){var b=document.createElement('button');b.dataset.k=k;b.setAttribute('aria-label',PAL[k].n);b.style.background=PAL[k].sw;b.addEventListener('click',function(){setColor(k);});sw.appendChild(b);});
+if(keys.length<2)sw.style.display='none';
+setColor(keys[0]);
+window.addEventListener('message',function(e){var d=e.data;if(d&&d.stoolColor&&PAL[d.stoolColor]){setColor(d.stoolColor);}});
+
+var controls=new THREE.OrbitControls(camera,cv);
+controls.target.set(0,0.5,0);controls.enableDamping=true;controls.dampingFactor=0.07;
+controls.minDistance=2;controls.maxDistance=12;controls.maxPolarAngle=Math.PI*0.72;
+controls.autoRotate=true;controls.autoRotateSpeed=2;
+var rt;controls.addEventListener('start',function(){controls.autoRotate=false;clearTimeout(rt);});
+controls.addEventListener('end',function(){rt=setTimeout(function(){controls.autoRotate=true;},2500);});
+
+/* Transformation tabouret <-> sac : t=0 tabouret, t=1 sac */
+var X=new V(1,0,0),Z=new V(0,0,1),qx=new THREE.Quaternion(),qz=new THREE.Quaternion();
+qx.setFromAxisAngle(X,Math.PI/2);qz.setFromAxisAngle(Z,Math.PI);var qT=new THREE.Quaternion().copy(qz).multiply(qx),qInv=new THREE.Quaternion().setFromAxisAngle(X,Math.PI);
+function ss(a,b,x){x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x);}
+function applyPose(t){
+  /* tout reste attaché : 1 on retourne le tabouret, 2 les 4 tiges se rejoignent au milieu,
+     3 le faisceau pivote (étape 7) et se couche dans la pochette creuse, 4 le sac se redresse, 5 la bandoulière se déploie */
+  var u1=ss(0,0.22,t),uf=ss(0.2,0.42,t),ui=ss(0.4,0.62,t),us=ss(0.74,0.94,t),ust=ss(0.94,1,t);
+  frames[0].g.rotation.x=0.72*uf;frames[1].g.rotation.x=-0.72*uf;frames[1].g.position.z=0.045*uf;
+  frameRoot.position.y=0.45+0.45*ui;frameRoot.rotation.x=ui*Math.PI/2;frameRoot.scale.y=1-0.3*ui;
+  if(us>0){pp.quaternion.copy(qInv).slerp(qT,us);}else{pp.quaternion.setFromAxisAngle(X,Math.PI*u1);}
+  pp.position.y=0.925-0.84*u1+0.9*Math.sin(Math.PI*u1)+0.365*us;
+  pp.scale.set(1+0.9*us,1+1.47*us,1);
+  var showBag=t>=0.94;bag.visible=showBag;pp.visible=!showBag;
+  sg.scale.y=Math.max(0.001,ust);
+  controls.target.y=0.5-0.1*u1+1.2*us;
+}
+var tcur=0,tgoal=0,last=performance.now(),tb=document.getElementById('trBtn'),camDist=4.8,camAuto=false;
+tb.addEventListener('click',function(){tgoal=tgoal?0:1;tb.textContent=tgoal?'Transformer en tabouret':'Transformer en sac';camDist=tgoal?7.6:4.8;camAuto=true;});
+function resize(){
+  var w=window.innerWidth,h=window.innerHeight;
+  renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?58:35;camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize);resize();
+renderer.setAnimationLoop(function(){
+  var n=performance.now(),dt=Math.min((n-last)/1000,0.05);last=n;
+  if(tcur!==tgoal){var d=tgoal-tcur,st=dt*0.42;tcur+=Math.abs(d)<=st?d:(d>0?st:-st);}
+  applyPose(tcur);
+  if(camAuto){var off=camera.position.clone().sub(controls.target),dc=off.length();camera.position.copy(controls.target).addScaledVector(off.normalize(),dc+(camDist-dc)*0.04);if(Math.abs(camDist-dc)<0.02)camAuto=false;}
+  controls.update();renderer.render(scene,camera);
+});
+})();
+</script>
+</body>
+</html>

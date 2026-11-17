@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ventilateur portable 3D</title>
+<style>
+:root{--bg1:#eef3f2;--bg2:#c9d6d3;--ink:#1d2b29;--mute:#5d6f6c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#2a3533;--bg2:#121817;--ink:#e8f0ee;--mute:#9db0ac}}
+:root[data-theme="dark"]{--bg1:#2a3533;--bg2:#121817;--ink:#e8f0ee;--mute:#9db0ac}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(circle at 50% 40%,var(--bg1),var(--bg2));color:var(--ink);font-family:"Avenir Next",system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#c:active{cursor:grabbing}
+header{position:fixed;left:20px;top:calc(env(safe-area-inset-top,0px) + 16px);pointer-events:none}
+h1{margin:0;font-size:1.15rem;font-weight:600;letter-spacing:.01em}
+p{margin:2px 0 0;font-size:.85rem;color:var(--mute)}
+footer{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);text-align:center;font-size:.8rem;color:var(--mute);pointer-events:none}
+#sw{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 52px);display:flex;justify-content:center;gap:14px}
+#sw button{width:38px;height:38px;border-radius:50%;border:2px solid var(--mute);padding:0;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+#sw button.on{border-color:var(--ink);box-shadow:0 0 0 3px var(--bg1),0 0 0 5px var(--ink)}
+#windBtn{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 16px);padding:8px 14px;border-radius:999px;border:1.5px solid var(--mute);background:transparent;color:var(--ink);font:inherit;font-size:.85rem;cursor:pointer}
+</style>
+<style>html,body{background:transparent!important}header,#sw{display:none!important}#windBtn{top:auto!important;bottom:10px;right:10px}</style>
+</head>
+<body>
+<canvas id="c" aria-label="Modèle 3D du ventilateur, faites glisser pour tourner"></canvas>
+<header><h1>Ventilateur portable</h1><p id="sub">Vert, à main</p></header>
+<div id="sw" role="group" aria-label="Choisir la couleur">
+<button data-k="vert" aria-label="Vert" style="background:#a6dbcb"></button>
+<button data-k="rose" aria-label="Rose" style="background:#f0b9bd"></button>
+<button data-k="blanc" aria-label="Blanc" style="background:#e9e9ee"></button>
+<button data-k="noir" aria-label="Noir" style="background:#35383c"></button>
+</div>
+<button id="windBtn">Vent : activé</button>
+<footer>Glisse pour tourner · pince ou molette pour zoomer</footer>
+<script src="vendor128/three.min.js"></script>
+<script src="vendor128/OrbitControls.js"></script>
+<script>
+(function(){
+var cv=document.getElementById('c');
+var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.NoToneMapping;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+var scene=new THREE.Scene();
+var camera=new THREE.PerspectiveCamera(35,1,0.1,100);
+camera.position.set(3,1.2,13.5);
+
+/* Environnement de reflets : ciel dégradé + panneaux lumineux */
+var envScene=new THREE.Scene();
+var gc=document.createElement('canvas');gc.width=4;gc.height=256;
+var gx=gc.getContext('2d'),gr=gx.createLinearGradient(0,0,0,256);
+gr.addColorStop(0,'#f2f7fa');gr.addColorStop(.5,'#9fb0b5');gr.addColorStop(.52,'#5a5148');gr.addColorStop(1,'#2b241d');
+gx.fillStyle=gr;gx.fillRect(0,0,4,256);
+envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(gc),side:THREE.BackSide})));
+function panel(w,h,x,y,z,k){var m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(k,k,k),side:THREE.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);envScene.add(m);}
+panel(28,10,-24,16,18,2.2);panel(20,8,26,10,-14,1.8);panel(30,6,0,34,0,2);panel(10,14,30,2,20,1.5);panel(6,30,-30,5,-10,1.6);
+var pm=new THREE.PMREMGenerator(renderer);
+scene.environment=pm.fromScene(envScene,0.02).texture;
+var sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(2,10,5);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);sun.shadow.radius=7;sun.shadow.bias=-0.0006;
+var sc_=sun.shadow.camera;sc_.left=-8;sc_.right=8;sc_.top=8;sc_.bottom=-8;sc_.near=1;sc_.far=30;scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xeaf4f1,0x6b5a48,0.35));
+var ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:0.22}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-1.25;ground.receiveShadow=true;scene.add(ground);
+
+var gc2=document.createElement('canvas');gc2.width=gc2.height=128;var gg=gc2.getContext('2d'),im=gg.createImageData(128,128);
+for(var q=0;q<im.data.length;q+=4){var v=110+Math.random()*60|0;im.data[q]=im.data[q+1]=im.data[q+2]=v;im.data[q+3]=255;}
+gg.putImageData(im,0,0);var grain=new THREE.CanvasTexture(gc2);grain.wrapS=grain.wrapT=THREE.RepeatWrapping;grain.repeat.set(6,6);
+function col(h){return new THREE.Color(h).convertSRGBToLinear();}
+function mat(h,rough,coat){return new THREE.MeshPhysicalMaterial({color:col(h),roughness:rough,metalness:0,clearcoat:coat,clearcoatRoughness:0.3});}
+var mintHead=mat('#a0b3a8',0.5,0.12), rimMint=mat('#b4d6c9',0.45,0.15), mintBody=mat('#a6dbcb',0.42,0.25), panel=mat('#c4dccf',0.5,0.15), mintNeck=mat('#bfd3c1',0.48,0.15), btn=mat('#cddcce',0.42,0.2), vane=mat('#b9c0c4',0.4,0.15);
+var silver=new THREE.MeshStandardMaterial({color:col('#c9cdd0'),metalness:1,roughness:0.22});
+var dark=new THREE.MeshStandardMaterial({color:col('#0e1213'),roughness:0.35,metalness:0.2});
+var glass=new THREE.MeshPhysicalMaterial({color:col('#0a0c0d'),roughness:0.18,metalness:0.1,clearcoat:1,clearcoatRoughness:0.04});
+var white=new THREE.MeshStandardMaterial({color:col('#4a5058'),metalness:0.95,roughness:0.1});
+
+function slab(w,h,d,r,b,bt){bt=bt||b;
+  var ww=w-2*b,hh=h-2*b,rr=Math.max(r-b,0.01),x=-ww/2,y=-hh/2,s=new THREE.Shape();
+  s.moveTo(x+rr,y);s.lineTo(x+ww-rr,y);s.quadraticCurveTo(x+ww,y,x+ww,y+rr);
+  s.lineTo(x+ww,y+hh-rr);s.quadraticCurveTo(x+ww,y+hh,x+ww-rr,y+hh);
+  s.lineTo(x+rr,y+hh);s.quadraticCurveTo(x,y+hh,x,y+hh-rr);
+  s.lineTo(x,y+rr);s.quadraticCurveTo(x,y,x+rr,y);
+  var dd=d-2*bt,g=new THREE.ExtrudeGeometry(s,{depth:dd,bevelEnabled:true,bevelThickness:bt,bevelSize:b,bevelSegments:8,curveSegments:24});
+  g.translate(0,0,-dd/2);return g;
+}
+function hexTex(){
+  var c=document.createElement('canvas');c.width=c.height=512;var g=c.getContext('2d');
+  g.fillStyle='#14181a';g.fillRect(0,0,512,512);g.strokeStyle='#cfd6d4';g.lineWidth=2;
+  var r=11,h=Math.sqrt(3)*r;
+  for(var col_=0;col_*1.5*r<560;col_++)for(var row=0;row*h<560;row++){
+    var x=col_*1.5*r,y=row*h+(col_%2?h/2:0);g.beginPath();
+    for(var k=0;k<6;k++){var a=Math.PI/3*k;g[k?'lineTo':'moveTo'](x+r*Math.cos(a),y+r*Math.sin(a));}
+    g.closePath();g.stroke();
+  }
+  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;
+}
+
+
+function notchSlab(L,W,d,r,t,nw,nd,b,bt){bt=bt||b;
+  var x0=b,x1=L-b,y0=-W/2+b,y1=W/2-b,nh=nw/2+b,s=new THREE.Shape();
+  s.moveTo(x0+r,y0);s.lineTo(x1-t,y0);s.quadraticCurveTo(x1,y0,x1,y0+t);
+  s.lineTo(x1,-nh);s.lineTo(x1-nd,-nh);s.lineTo(x1-nd,nh);s.lineTo(x1,nh);
+  s.lineTo(x1,y1-t);s.quadraticCurveTo(x1,y1,x1-t,y1);s.lineTo(x0+r,y1);
+  s.quadraticCurveTo(x0,y1,x0,y1-r);s.lineTo(x0,y0+r);s.quadraticCurveTo(x0,y0,x0+r,y0);
+  var dd=d-2*bt,g=new THREE.ExtrudeGeometry(s,{depth:dd,bevelEnabled:true,bevelThickness:bt,bevelSize:b,bevelSegments:8,curveSegments:24});
+  g.translate(0,0,-dd/2);return g;
+}
+
+function loopGeo(){
+  var w=0.32,h=0.15,r=0.06,x=-w/2,y=-h/2,s=new THREE.Shape();
+  s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);
+  var p=new THREE.Path();p.moveTo(-0.09,-0.025);p.lineTo(0.09,-0.025);p.lineTo(0.09,0.025);p.lineTo(-0.09,0.025);p.closePath();s.holes.push(p);
+  var g=new THREE.ExtrudeGeometry(s,{depth:0.14,bevelEnabled:true,bevelThickness:0.02,bevelSize:0.02,bevelSegments:3,curveSegments:8});
+  g.translate(0,0,-0.07);return g;
+}
+function dispTex(){
+  var c=document.createElement('canvas');c.width=256;c.height=104;var g=c.getContext('2d');
+  g.strokeStyle='#9a9cff';g.lineWidth=8;g.lineCap='round';g.shadowColor='#6a6cff';g.shadowBlur=14;
+  var M={'0':'abcdef','1':'bc'};
+  function dg(d,x,y,w,h){var S={a:[x,y,x+w,y],b:[x+w,y,x+w,y+h/2],c:[x+w,y+h/2,x+w,y+h],d:[x,y+h,x+w,y+h],e:[x,y+h/2,x,y+h],f:[x,y,x,y+h/2]};
+    M[d].split('').forEach(function(k){var p=S[k];g.beginPath();g.moveTo(p[0],p[1]);g.lineTo(p[2],p[3]);g.stroke();});}
+  dg('1',34,14,50,76);dg('0',100,14,50,76);dg('0',166,14,50,76);
+  return new THREE.CanvasTexture(c);
+}
+function btnTex(){
+  var c=document.createElement('canvas');c.width=540;c.height=170;var g=c.getContext('2d');
+  g.strokeStyle='#8e8b84';g.fillStyle='#8e8b84';g.lineWidth=4;g.lineCap='round';
+  function pill(x){g.beginPath();g.moveTo(x+60,6);g.lineTo(x+200,6);g.arc(x+200,85,79,-Math.PI/2,Math.PI/2);g.lineTo(x+60,164);g.arc(x+60,85,79,Math.PI/2,Math.PI*1.5);g.closePath();g.stroke();}
+  pill(4);pill(266);
+  for(var k=0;k<4;k++){var a=k*Math.PI/4;g.beginPath();g.moveTo(80-Math.cos(a)*22,85-Math.sin(a)*22);g.lineTo(80+Math.cos(a)*22,85+Math.sin(a)*22);g.stroke();}
+  g.beginPath();g.moveTo(190,62);g.lineTo(168,85);g.lineTo(190,108);g.stroke();
+  g.beginPath();g.moveTo(300,62);g.lineTo(322,85);g.lineTo(300,108);g.stroke();
+  g.beginPath();g.arc(440,88,24,-Math.PI*0.35,Math.PI*1.35);g.stroke();
+  g.beginPath();g.moveTo(440,56);g.lineTo(440,84);g.stroke();
+  return new THREE.CanvasTexture(c);
+}
+function labelTex(bg,fg){
+  var c=document.createElement('canvas');c.width=512;c.height=320;var g=c.getContext('2d');
+  g.fillStyle=bg||'rgba(238,246,244,0.7)';g.fillRect(0,0,512,320);g.fillStyle=fg||'#4a5856';
+  g.font='600 31px system-ui,sans-serif';g.textAlign='center';
+  ['Handheld Portable Turbo Fan','Model Number: H03B','Battery Capacity:3600mah','Input:5V  2A'].forEach(function(l,k){g.fillText(l,256,80+k*62);});
+  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;
+}
+var fan=new THREE.Group();scene.add(fan);
+function add(geo,m,x,y,z){var o=new THREE.Mesh(geo,m);o.position.set(x,y,z);fan.add(o);return o;}
+var HX=4.70,R=1,H=0.84; /* axe long = X, tête à droite, face avant = +Z */
+/* Batterie / poignée avec encoche en U */
+add(notchSlab(3.2,1.44,0.85,0.45,0.09,0.92,0.44,0.07,0.22),[panel,mintBody],0,0,0);
+/* Cou articulé (écran + boutons) niché dans l'encoche */
+add(slab(2.1,0.82,0.72,0.3,0.09,0.22),mintNeck,3.65,0,0);
+/* Tête : corps, collier argenté avant, lèvre arrière */
+var body=add(new THREE.CylinderGeometry(R,R,1.56,72,1,true),mintHead,HX,0,-0.06);
+body.rotation.x=Math.PI/2;body.material.side=THREE.DoubleSide;
+var collar=add(new THREE.LatheGeometry([new THREE.Vector2(0.84,0.1),new THREE.Vector2(0.92,0.12),new THREE.Vector2(0.985,0.07),new THREE.Vector2(1.0,0.0),new THREE.Vector2(1.0,-0.12),new THREE.Vector2(0.97,-0.12)],96),silver,HX,0,H-0.12);
+collar.rotation.x=Math.PI/2;silver.side=THREE.DoubleSide;
+add(new THREE.CircleGeometry(0.84,64),dark,HX,0,0.2);
+/* 12 pales fixes incurvées + moyeu miroir */
+var vg=new THREE.BoxGeometry(0.36,0.1,0.3);
+for(var i=0;i<12;i++){
+  var a=i/12*Math.PI*2,v=new THREE.Mesh(vg,vane);
+  v.position.set(HX+Math.cos(a)*0.69,Math.sin(a)*0.69,0.5);v.rotation.z=a+0.55;fan.add(v);
+}
+var hub=add(new THREE.CylinderGeometry(0.56,0.56,0.14,64),silver,HX,0,0.64);hub.rotation.x=Math.PI/2;
+add(new THREE.CircleGeometry(0.5,64),white,HX,0,0.712);
+/* Dos de la tête : lèvre + grille nid d'abeille */
+add(new THREE.TorusGeometry(0.89,0.11,24,96),rimMint,HX,0,-H+0.1);
+var hx=add(new THREE.CircleGeometry(0.84,64),new THREE.MeshStandardMaterial({map:hexTex(),roughness:0.5,metalness:0.2}),HX,0,-0.62);
+hx.rotation.y=Math.PI;
+/* Face avant du cou : écran + 2 boutons côte à côte */
+add(slab(0.23,0.5,0.06,0.05,0.012),glass,3.41,0,0.38);
+var dp=add(new THREE.PlaneGeometry(0.46,0.19),new THREE.MeshBasicMaterial({map:dispTex(),transparent:true}),3.41,0,0.412);dp.rotation.z=-Math.PI/2;
+add(slab(0.17,0.26,0.07,0.08,0.02),btn,3.14,0.135,0.38);
+add(slab(0.17,0.26,0.07,0.08,0.02),btn,3.14,-0.135,0.38);
+var bp=add(new THREE.PlaneGeometry(0.54,0.17),new THREE.MeshBasicMaterial({map:btnTex(),transparent:true}),3.14,0,0.418);bp.rotation.z=-Math.PI/2;
+/* Dos : USB-C, 2 vis de charnière, étiquette */
+add(slab(0.15,0.42,0.03,0.07,0.01),mintNeck,3.08,0,-0.365);
+add(slab(0.07,0.27,0.05,0.03,0.008),dark,3.08,0,-0.375);
+var screwG=new THREE.CylinderGeometry(0.05,0.05,0.03,16);
+[0.55,-0.55].forEach(function(y){var sc=add(screwG,silver,3.17,y,-0.44);sc.rotation.x=Math.PI/2;});
+var lab=add(new THREE.PlaneGeometry(0.97,0.61),new THREE.MeshBasicMaterial({map:labelTex(),transparent:true,color:0xcfd6d4}),1.5,0,-0.432);
+lab.rotation.set(0,Math.PI,Math.PI/2);
+/* Côtés de la batterie : bouton-pastille + attaches de dragonne */
+[1,-1].forEach(function(k){add(loopGeo(),mintBody,2.85,k*0.775,0);});
+
+fan.rotation.z=Math.PI/2;fan.updateMatrixWorld(true);var bc=new THREE.Box3().setFromObject(fan).getCenter(new THREE.Vector3());fan.position.sub(bc);
+var pivot=new THREE.Group();scene.add(pivot);pivot.add(fan);pivot.rotation.y=-0.5;
+fan.updateMatrixWorld(true);ground.position.y=new THREE.Box3().setFromObject(fan).min.y-0.005;
+/* Rotor visible derrière les pales fixes */
+var rotor=new THREE.Group();rotor.position.set(HX,0,0.26);fan.add(rotor);
+var bmat=new THREE.MeshStandardMaterial({color:col('#2c3136'),roughness:0.5,metalness:0.2}),bgeo=new THREE.BoxGeometry(0.62,0.22,0.03);
+for(var bi=0;bi<7;bi++){var ba=bi/7*Math.PI*2,bl=new THREE.Mesh(bgeo,bmat);bl.rotation.order='ZYX';bl.position.set(Math.cos(ba)*0.46,Math.sin(ba)*0.46,0);bl.rotation.set(0.55,0,ba);rotor.add(bl);}
+/* Flux d'air : particules qui sortent de la face avant */
+var WN=240,wp=new Float32Array(WN*3),wa=new Float32Array(WN),ws=new Float32Array(WN),wd=[];
+function spawn(i,first){var d=wd[i]||(wd[i]={});d.r0=Math.sqrt(Math.random())*0.78;d.th=Math.random()*6.283;d.vz=1.8+Math.random()*1.4;d.sp=0.12+Math.random()*0.3;d.w=(Math.random()-0.5)*1.2;d.life=2+Math.random()*1.4;d.age=first?Math.random()*d.life:0;}
+for(var wi=0;wi<WN;wi++)spawn(wi,true);
+var wg=new THREE.BufferGeometry();
+wg.setAttribute('position',new THREE.BufferAttribute(wp,3));wg.setAttribute('aA',new THREE.BufferAttribute(wa,1));wg.setAttribute('aS',new THREE.BufferAttribute(ws,1));
+var windU={uScale:{value:600},uC:{value:new THREE.Color('#9ccbea')}};
+var wind=new THREE.Points(wg,new THREE.ShaderMaterial({uniforms:windU,transparent:true,depthWrite:false,
+ vertexShader:'attribute float aA;attribute float aS;uniform float uScale;varying float vA;void main(){vA=aA;vec4 mv=modelViewMatrix*vec4(position,1.0);gl_PointSize=aS*uScale/(-mv.z);gl_Position=projectionMatrix*mv;}',
+ fragmentShader:'uniform vec3 uC;varying float vA;void main(){float d=length(gl_PointCoord-0.5);gl_FragColor=vec4(uC,smoothstep(0.5,0.1,d)*vA);}'}));
+wind.frustumCulled=false;fan.add(wind);
+var windOn=1,windTarget=1,last=performance.now();
+function tickWind(dt){
+  windOn+=(windTarget-windOn)*Math.min(1,dt*4);rotor.rotation.z-=dt*28*windOn;
+  for(var i=0;i<WN;i++){var d=wd[i];d.age+=dt;if(d.age>=d.life)spawn(i,false);
+    var t=d.age/d.life,r=d.r0+d.sp*d.age,th=d.th+d.w*d.age;
+    wp[i*3]=HX+r*Math.cos(th);wp[i*3+1]=r*Math.sin(th);wp[i*3+2]=H+0.06+d.vz*d.age;
+    wa[i]=Math.min(1,t*8)*(1-t)*0.55*windOn;ws[i]=0.05+0.1*t;}
+  wg.attributes.position.needsUpdate=wg.attributes.aA.needsUpdate=wg.attributes.aS.needsUpdate=true;
+}
+var wb=document.getElementById('windBtn');
+wb.addEventListener('click',function(){windTarget=windTarget?0:1;wb.textContent='Vent : '+(windTarget?'activé':'désactivé');});
+fan.traverse(function(o){if(o.isMesh&&!o.material.isMeshBasicMaterial)o.castShadow=true;});
+
+var PAL={
+ vert:{n:'Vert',head:'#a0b3a8',rim:'#b4d6c9',body:'#a6dbcb',panel:'#c4dccf',neck:'#bfd3c1',btn:'#cddcce',lab:['rgba(238,246,244,0.7)','#4a5856']},
+ rose:{n:'Rose',head:'#e6c9cf',rim:'#f2c6ca',body:'#f2bcc0',panel:'#f5cfd0',neck:'#f3cbca',btn:'#f7dddb',lab:['rgba(250,236,236,0.7)','#6a5558']},
+ blanc:{n:'Blanc',head:'#ebebf0',rim:'#e8e8ee',body:'#dcdde3',panel:'#eeeef2',neck:'#e5e5ea',btn:'#f0f0f3',lab:['rgba(245,246,248,0.75)','#555a60']},
+ noir:{n:'Noir',head:'#34373b',rim:'#2d3034',body:'#c9cdd1',panel:'#3b3e43',neck:'#35383c',btn:'#3e4146',lab:['rgba(52,55,59,0.9)','#a9afb4']}
+};
+function setColor(k){
+  var p=PAL[k];
+  mintHead.color.copy(col(p.head));rimMint.color.copy(col(p.rim));mintBody.color.copy(col(p.body));
+  panel.color.copy(col(p.panel));mintNeck.color.copy(col(p.neck));btn.color.copy(col(p.btn));
+  lab.material.map=labelTex(p.lab[0],p.lab[1]);lab.material.needsUpdate=true;
+  document.getElementById('sub').textContent=p.n+', à main';
+  Array.prototype.forEach.call(document.querySelectorAll('#sw button'),function(b){b.classList.toggle('on',b.dataset.k===k);});
+}
+Array.prototype.forEach.call(document.querySelectorAll('#sw button'),function(b){b.addEventListener('click',function(){setColor(b.dataset.k);});});
+window.addEventListener('message',function(e){var d=e.data;if(d&&d.fanColor){setColor(d.fanColor);}});
+setColor('vert');
+var controls=new THREE.OrbitControls(camera,cv);
+controls.enableDamping=true;controls.dampingFactor=0.07;
+controls.minDistance=4.5;controls.maxDistance=18;
+controls.autoRotate=true;controls.autoRotateSpeed=2.5;
+var rt;controls.maxPolarAngle=Math.PI*0.53;controls.addEventListener('start',function(){controls.autoRotate=false;clearTimeout(rt);});controls.addEventListener('end',function(){rt=setTimeout(function(){controls.autoRotate=true;},2500);});
+
+function resize(){
+  var w=window.innerWidth,h=window.innerHeight;
+  renderer.setSize(w,h,false);camera.aspect=w/h;
+  camera.fov=w<h?64:35;camera.updateProjectionMatrix();windU.uScale.value=h*renderer.getPixelRatio()/(2*Math.tan(camera.fov*Math.PI/360));
+}
+window.addEventListener('resize',resize);resize();
+renderer.setAnimationLoop(function(){var n=performance.now(),dt=Math.min((n-last)/1000,0.05);last=n;tickWind(dt);controls.update();renderer.render(scene,camera);});
+})();
+</script>
+</body>
+</html>
