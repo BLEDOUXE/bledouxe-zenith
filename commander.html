@@ -304,6 +304,22 @@
     .price-tag .amount{font-size:1.6rem;}
     .order-btn{font-size:0.7rem;padding:0.55rem 0.9rem;}
   }
+
+  /* ---- placement du bouton "Cliquer" et du panneau (aucun chevauchement) ---- */
+  #earthPrompt{top:15vh !important;transform:translate(-50%,0) !important;}
+  .planet-holo{bottom:7rem !important;max-height:40vh;overflow-y:auto;}
+  .planet-holo.visible{pointer-events:auto;}
+  @media (max-width:720px){
+    #earthPrompt{top:12vh !important;}
+    .planet-holo{bottom:6.4rem !important;max-height:38vh;padding:0.9rem 1rem;}
+    .planet-holo-body{font-size:0.8rem;line-height:1.5;}
+  }
+  .planet-holo[dir="rtl"]{text-align:right;}
+  .planet-holo[dir="rtl"] li{padding-left:0;padding-right:1.1rem;}
+  .planet-holo[dir="rtl"] li::before{left:auto;right:0;content:"◂";}
+  .planet-holo[dir="rtl"] .planet-holo-title{flex-direction:row-reverse;justify-content:flex-end;}
+  #destLogoWrap{transition:opacity .5s ease;}
+  #destLogoWrap.gone{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .5s ease, visibility 0s linear .5s;}
 </style>
 </head>
 <body>
@@ -430,13 +446,33 @@ import { ShaderPass } from './assets/vendor/ShaderPass.js';
 /* ============================================================
    CONTENU HOLOGRAMME (fiche produit découpée en 5)
    ============================================================ */
-const holoContent = {
-  description: { title:"1 — Description", body:"<p>Le tabouret pliant avec sac à dos intégré est pratique, élégant et multifonction. Il se transforme en quelques secondes d'un sac de transport à un tabouret confortable, idéal pour toutes vos activités en plein air.</p>" },
-  avantages: { title:"2 — Les avantages", body:"<ul><li>Portable : se porte facilement à la main ou en bandoulière.</li><li>Léger : seulement 730 g, idéal pour vos déplacements.</li><li>Pratique : se transforme rapidement d'un tabouret en sacoche.</li><li>Compact : se plie facilement pour être transporté et rangé.</li></ul>" },
-  caracteristiques: { title:"3 — Caractéristiques", body:"<ul><li>Poids : 730 g</li><li>Capacité de charge : 120 kg (240 lb)</li><li>Structure : acier galvanisé 13 × 0,8 mm</li><li>Tissu : Oxford 600D</li><li>Dimensions dépliées : 29 × 25 × 31 cm</li><li>Dimensions pliées : 32 × 14 × 5 cm</li><li>Pliable : oui</li><li>Fonction : tabouret + sacoche 2-en-1</li><li>Traitement : protection anti-rouille intérieur et extérieur</li></ul>" },
-  couleurs: { title:"4 — Couleurs disponibles", body:"<ul><li>Noir</li><li>Vert</li><li>Kaki</li></ul>" },
-  utilisations: { title:"5 — Utilisations", body:"<p>Convient pour :</p><ul><li>Camping</li><li>Randonnée</li><li>Pêche</li><li>Plage</li><li>Jardin</li><li>Pique-nique</li><li>Voyages</li><li>Festivals</li><li>Événements sportifs</li><li>Activités de plein air</li></ul>" }
-};
+/* ============================================================
+   LANGUE : celle choisie sur le site principal (index.html)
+   ============================================================ */
+const LANG = (() => { try { const l = localStorage.getItem('bz-lang'); return ['fr','en','es','ar'].includes(l) ? l : 'fr'; } catch(e){ return 'fr'; } })();
+const UI_ALL = {"fr": {"back": "← Retour au site", "loading": "Chargement des textures réelles…", "click": "Cliquer", "clickEarth": "Cliquer sur la Terre", "hint": "Glisse pour regarder autour de toi · molette pour zoomer", "skip": "Passer l'intro →", "zoomHint": "Glisse pour faire tourner l'objet", "insta": "Commander sur Instagram", "snap": "Commander sur Snapchat", "mail": "Commander par mail", "mailSubject": "Commande Bledouxe | Zenith", "mailBody": "Bonjour,\n\nJe souhaite commander :\n- Couleur : \n\nMerci !", "label1": "Tabouret 2-en-1", "label2": "Mini refroidisseur d'air"}, "en": {"back": "← Back to site", "loading": "Loading real textures…", "click": "Click", "clickEarth": "Click on Earth", "hint": "Drag to look around · scroll to zoom", "skip": "Skip intro →", "zoomHint": "Drag to rotate the object", "insta": "Order on Instagram", "snap": "Order on Snapchat", "mail": "Order by email", "mailSubject": "Bledouxe | Zenith order", "mailBody": "Hello,\n\nI would like to order:\n- Color: \n\nThank you!", "label1": "2-in-1 Stool", "label2": "Portable mini air cooler"}, "es": {"back": "← Volver al sitio", "loading": "Cargando texturas reales…", "click": "Haz clic", "clickEarth": "Haz clic en la Tierra", "hint": "Desliza para mirar alrededor · rueda para hacer zoom", "skip": "Saltar intro →", "zoomHint": "Desliza para girar el objeto", "insta": "Pedir por Instagram", "snap": "Pedir por Snapchat", "mail": "Pedir por correo", "mailSubject": "Pedido Bledouxe | Zenith", "mailBody": "Hola,\n\nQuiero pedir:\n- Color: \n\n¡Gracias!", "label1": "Taburete 2 en 1", "label2": "Mini enfriador de aire portátil"}, "ar": {"back": "→ العودة إلى الموقع", "loading": "جارٍ تحميل القوام الحقيقي…", "click": "انقر", "clickEarth": "انقر على الأرض", "hint": "اسحب للنظر حولك · استخدم العجلة للتكبير", "skip": "← تخطي المقدمة", "zoomHint": "اسحب لتدوير الجسم", "insta": "اطلب عبر إنستغرام", "snap": "اطلب عبر سناب شات", "mail": "اطلب عبر البريد", "mailSubject": "طلب Bledouxe | Zenith", "mailBody": "مرحبًا،\n\nأرغب في طلب:\n- اللون: \n\nشكرًا!", "label1": "كرسي 2 في 1", "label2": "مبرّد هواء صغير محمول"}};
+const U = UI_ALL[LANG] || UI_ALL.fr;
+const HOLO_ALL = {"fr": {"description": {"title": "1 — Description", "body": "<p>Le tabouret pliant avec sac à dos intégré est pratique, élégant et multifonction. Il se transforme en quelques secondes d'un sac de transport à un tabouret confortable, idéal pour toutes vos activités en plein air.</p>"}, "avantages": {"title": "2 — Les avantages", "body": "<ul><li>Portable : se porte facilement à la main ou en bandoulière.</li><li>Léger : seulement 730 g, idéal pour vos déplacements.</li><li>Pratique : se transforme rapidement d'un tabouret en sacoche.</li><li>Compact : se plie facilement pour être transporté et rangé.</li></ul>"}, "caracteristiques": {"title": "3 — Caractéristiques", "body": "<ul><li>Poids : 730 g</li><li>Capacité de charge : 120 kg (240 lb)</li><li>Structure : acier galvanisé 13 × 0,8 mm</li><li>Tissu : Oxford 600D</li><li>Dimensions dépliées : 29 × 25 × 31 cm</li><li>Dimensions pliées : 32 × 14 × 5 cm</li><li>Pliable : oui</li><li>Fonction : tabouret + sacoche 2-en-1</li><li>Traitement : protection anti-rouille intérieur et extérieur</li></ul>"}, "couleurs": {"title": "4 — Couleurs disponibles", "body": "<ul><li>Noir</li><li>Vert</li><li>Kaki</li></ul>"}, "utilisations": {"title": "5 — Utilisations", "body": "<p>Convient pour :</p><ul><li>Camping</li><li>Randonnée</li><li>Pêche</li><li>Plage</li><li>Jardin</li><li>Pique-nique</li><li>Voyages</li><li>Festivals</li><li>Événements sportifs</li><li>Activités de plein air</li></ul>"}}, "en": {"description": {"title": "1 — Description", "body": "<p>The foldable stool with built-in backpack is practical, stylish, and multifunctional. It transforms from a carrying bag into a comfortable stool within seconds, making it perfect for all your outdoor activities.</p>"}, "avantages": {"title": "2 — Benefits", "body": "<ul><li>Portable: easy to carry by hand or over the shoulder.</li><li>Lightweight: only 730 g, ideal for travelling.</li><li>Practical: quickly turns from a stool into a shoulder bag.</li><li>Compact: folds easily for carrying and storage.</li></ul>"}, "caracteristiques": {"title": "3 — Specifications", "body": "<ul><li>Weight: 730 g</li><li>Load capacity: 120 kg (240 lbs)</li><li>Frame: galvanized steel 13 × 0.8 mm</li><li>Fabric: 600D Oxford</li><li>Unfolded size: 29 × 25 × 31 cm</li><li>Folded size: 32 × 14 × 5 cm</li><li>Foldable: yes</li><li>Function: 2-in-1 stool + shoulder bag</li><li>Treatment: anti-rust protection inside and out</li></ul>"}, "couleurs": {"title": "4 — Available Colors", "body": "<ul><li>Black</li><li>Green</li><li>Khaki</li></ul>"}, "utilisations": {"title": "5 — Applications", "body": "<p>Suitable for:</p><ul><li>Camping</li><li>Hiking</li><li>Fishing</li><li>Beach</li><li>Garden</li><li>Picnics</li><li>Travel</li><li>Festivals</li><li>Sporting events</li><li>Outdoor activities</li></ul>"}}, "es": {"description": {"title": "1 — Descripción", "body": "<p>El taburete plegable con mochila integrada es práctico, elegante y multifuncional. Se transforma en pocos segundos de una mochila de transporte a un cómodo taburete, ideal para todas sus actividades al aire libre.</p>"}, "avantages": {"title": "2 — Ventajas", "body": "<ul><li>Portátil: se lleva fácilmente en la mano o en bandolera.</li><li>Ligero: solo 730 g, ideal para tus desplazamientos.</li><li>Práctico: se transforma rápidamente de taburete a bolso.</li><li>Compacto: se pliega fácilmente para transportarlo y guardarlo.</li></ul>"}, "caracteristiques": {"title": "3 — Especificaciones", "body": "<ul><li>Peso: 730 g</li><li>Capacidad de carga: 120 kg (240 lb)</li><li>Estructura: acero galvanizado 13 × 0,8 mm</li><li>Tela: Oxford 600D</li><li>Dimensiones desplegado: 29 × 25 × 31 cm</li><li>Dimensiones plegado: 32 × 14 × 5 cm</li><li>Plegable: sí</li><li>Función: taburete + bolso 2 en 1</li><li>Tratamiento: protección antioxidante interior y exterior</li></ul>"}, "couleurs": {"title": "4 — Colores disponibles", "body": "<ul><li>Negro</li><li>Verde</li><li>Caqui</li></ul>"}, "utilisations": {"title": "5 — Usos", "body": "<p>Ideal para:</p><ul><li>Camping</li><li>Senderismo</li><li>Pesca</li><li>Playa</li><li>Jardín</li><li>Picnics</li><li>Viajes</li><li>Festivales</li><li>Eventos deportivos</li><li>Actividades al aire libre</li></ul>"}}, "ar": {"description": {"title": "1 — الوصف", "body": "<p>الكرسي القابل للطي المزود بحقيبة ظهر مدمجة عملي وأنيق ومتعدد الاستخدامات. يتحول في غضون ثوانٍ من حقيبة حمل إلى كرسي مريح، مما يجعله مثاليًا لجميع الأنشطة الخارجية.</p>"}, "avantages": {"title": "2 — المزايا", "body": "<ul><li>سهل الحمل: يُحمل بسهولة باليد أو على الكتف.</li><li>خفيف: 730 غرامًا فقط، مثالي لتنقلاتك.</li><li>عملي: يتحول بسرعة من كرسي إلى حقيبة.</li><li>صغير الحجم: يُطوى بسهولة للنقل والتخزين.</li></ul>"}, "caracteristiques": {"title": "3 — المواصفات", "body": "<ul><li>الوزن: 730 جم</li><li>قدرة التحمل: 120 كجم (240 رطلًا)</li><li>الهيكل: فولاذ مجلفن 13 × 0.8 مم</li><li>القماش: أكسفورد 600D</li><li>الأبعاد عند الفتح: 29 × 25 × 31 سم</li><li>الأبعاد عند الطي: 32 × 14 × 5 سم</li><li>قابل للطي: نعم</li><li>الوظيفة: كرسي + حقيبة 2 في 1</li><li>المعالجة: حماية ضد الصدأ من الداخل والخارج</li></ul>"}, "couleurs": {"title": "4 — الألوان المتوفرة", "body": "<ul><li>أسود</li><li>أخضر</li><li>كاكي</li></ul>"}, "utilisations": {"title": "5 — الاستخدامات", "body": "<p>مناسب لـ:</p><ul><li>التخييم</li><li>المشي لمسافات طويلة</li><li>صيد الأسماك</li><li>الشاطئ</li><li>الحديقة</li><li>النزهات</li><li>السفر</li><li>المهرجانات</li><li>الفعاليات الرياضية</li><li>الأنشطة الخارجية</li></ul>"}}};
+const holoContent = HOLO_ALL[LANG] || HOLO_ALL.fr;
+(function applyStaticTranslations(){
+  document.documentElement.lang = LANG;
+  const set = (sel, txt) => { const el = document.querySelector(sel); if(el) el.textContent = txt; };
+  set('.topbar a.back', U.back);
+  set('#loaderText', U.loading);
+  set('#freeLookHint', U.hint);
+  set('#skipLink', U.skip);
+  set('#productZoomOverlay .zoom-hint', U.zoomHint);
+  set('#logoPrompt', U.click);
+  set('.price-glass .label', 'Bledouxe | Zenith™ — ' + U.label1);
+  const btnText = (sel, txt) => { const el = document.querySelector(sel); if(!el) return; const n = el.lastChild; if(n && n.nodeType === 3) n.textContent = txt; else el.appendChild(document.createTextNode(txt)); };
+  btnText('.order-btn--insta', U.insta);
+  btnText('.order-btn--snap', U.snap);
+  btnText('.order-btn--gmail', U.mail);
+  const m = document.querySelector('.order-btn--gmail');
+  if(m) m.href = 'mailto:contact.bledouxezenith@gmail.com?subject=' + encodeURIComponent(U.mailSubject) + '&body=' + encodeURIComponent(U.mailBody);
+  const ph = document.getElementById('planetHolo');
+  if(ph) ph.setAttribute('dir', LANG === 'ar' ? 'rtl' : 'ltr');
+})();
 
 /* corps célestes réels traversés (textures NASA / JPL) */
 const PLANETS = [
@@ -768,7 +804,7 @@ function showPlanetInfo(index){
 
   if(p.isEarth){
     planetHolo.classList.remove('visible');
-    earthPrompt.textContent = 'Cliquer sur la Terre';
+    earthPrompt.textContent = U.clickEarth;
     earthPrompt.classList.add('visible');
     nextBtn.classList.add('hidden');
   } else {
@@ -776,7 +812,7 @@ function showPlanetInfo(index){
     planetHoloTitle.textContent = c.title;
     planetHoloBody.innerHTML = c.body;
     requestAnimationFrame(() => planetHolo.classList.add('visible'));
-    earthPrompt.textContent = 'Cliquer';
+    earthPrompt.textContent = U.click;
     earthPrompt.classList.add('visible');
     nextBtn.classList.add('hidden');
   }
@@ -858,6 +894,8 @@ function revealProducts(){
   if(productsRevealed) return;
   productsRevealed = true;
   logoPrompt.classList.remove('visible-static');
+  destLogoWrap.classList.add('gone');
+  setTimeout(() => destLogoWrap.classList.remove('visible'), 520);
   skipLink.style.display = 'none';
 
   setProductColor(selectedColor);
@@ -948,6 +986,7 @@ const clock = new THREE.Clock();
 function easeInOut(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
 function animate(){
   requestAnimationFrame(animate);
+  if(stage === 'lake') return; // écran final en HTML : plus aucun rendu 3D (économise la batterie)
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.getElapsedTime();
 
