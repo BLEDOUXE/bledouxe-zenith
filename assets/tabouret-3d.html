@@ -21,7 +21,8 @@ footer{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px)
 #sw button.on{border-color:var(--ink);box-shadow:0 0 0 3px var(--bg1),0 0 0 5px var(--ink)}
 #trBtn{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 16px);padding:8px 14px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg1);font:inherit;font-size:.85rem;cursor:pointer}
 </style>
-<style>html,body{background:transparent!important}header,#sw{display:none!important}#trBtn{top:auto!important;bottom:10px;right:10px}</style>
+<style>html,body{background:transparent!important}header,#sw{display:none!important}#trBtn{top:10px!important;bottom:auto!important;right:10px}</style>
+<script>var BZL=(function(){try{var l=localStorage.getItem('bz-lang');return /^(fr|en|es|ar)$/.test(l)?l:'fr'}catch(e){return 'fr'}})();var BZ={"fr": {"hint": "Glisse pour tourner · pince ou molette pour zoomer", "toSac": "Transformer en sac", "toStool": "Transformer en tabouret"}, "en": {"hint": "Drag to rotate · pinch or scroll to zoom", "toSac": "Turn into a bag", "toStool": "Turn into a stool"}, "es": {"hint": "Desliza para girar · pellizca o usa la rueda para hacer zoom", "toSac": "Transformar en bolso", "toStool": "Transformar en taburete"}, "ar": {"hint": "اسحب للتدوير · اقرص أو استخدم العجلة للتكبير", "toSac": "تحويل إلى حقيبة", "toStool": "تحويل إلى كرسي"}}[BZL];document.addEventListener('DOMContentLoaded',function(){var f=document.querySelector('footer');if(f)f.textContent=BZ.hint;var b=document.getElementById('trBtn');if(b)b.textContent=BZ.toSac;});</script>
 </head>
 <body>
 <canvas id="c" aria-label="Modèle 3D du tabouret pliant, faites glisser pour tourner"></canvas>
@@ -262,7 +263,7 @@ function applyPose(t){
   controls.target.y=0.5-0.1*u1+1.2*us;
 }
 var tcur=0,tgoal=0,last=performance.now(),tb=document.getElementById('trBtn'),camDist=4.8,camAuto=false;
-tb.addEventListener('click',function(){tgoal=tgoal?0:1;tb.textContent=tgoal?'Transformer en tabouret':'Transformer en sac';camDist=tgoal?7.6:4.8;camAuto=true;});
+tb.addEventListener('click',function(){tgoal=tgoal?0:1;tb.textContent=tgoal?BZ.toStool:BZ.toSac;camDist=tgoal?7.6:4.8;camAuto=true;});
 function resize(){
   var w=window.innerWidth,h=window.innerHeight;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?58:35;camera.updateProjectionMatrix();

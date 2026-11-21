@@ -21,7 +21,8 @@ footer{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px)
 #sw button.on{border-color:var(--ink);box-shadow:0 0 0 3px var(--bg1),0 0 0 5px var(--ink)}
 #windBtn{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 16px);padding:8px 14px;border-radius:999px;border:1.5px solid var(--mute);background:transparent;color:var(--ink);font:inherit;font-size:.85rem;cursor:pointer}
 </style>
-<style>html,body{background:transparent!important}header,#sw{display:none!important}#windBtn{top:auto!important;bottom:10px;right:10px}</style>
+<style>html,body{background:transparent!important}header,#sw{display:none!important}#windBtn{top:10px!important;bottom:auto!important;right:10px}</style>
+<script>var BZL=(function(){try{var l=localStorage.getItem('bz-lang');return /^(fr|en|es|ar)$/.test(l)?l:'fr'}catch(e){return 'fr'}})();var BZ={"fr": {"hint": "Glisse pour tourner · pince ou molette pour zoomer", "windOn": "Vent : activé", "windOff": "Vent : désactivé"}, "en": {"hint": "Drag to rotate · pinch or scroll to zoom", "windOn": "Wind: on", "windOff": "Wind: off"}, "es": {"hint": "Desliza para girar · pellizca o usa la rueda para hacer zoom", "windOn": "Viento: activado", "windOff": "Viento: desactivado"}, "ar": {"hint": "اسحب للتدوير · اقرص أو استخدم العجلة للتكبير", "windOn": "الرياح: مفعّلة", "windOff": "الرياح: متوقفة"}}[BZL];document.addEventListener('DOMContentLoaded',function(){var f=document.querySelector('footer');if(f)f.textContent=BZ.hint;var b=document.getElementById('windBtn');if(b)b.textContent=BZ.windOn;});</script>
 </head>
 <body>
 <canvas id="c" aria-label="Modèle 3D du ventilateur, faites glisser pour tourner"></canvas>
@@ -214,7 +215,7 @@ function tickWind(dt){
   wg.attributes.position.needsUpdate=wg.attributes.aA.needsUpdate=wg.attributes.aS.needsUpdate=true;
 }
 var wb=document.getElementById('windBtn');
-wb.addEventListener('click',function(){windTarget=windTarget?0:1;wb.textContent='Vent : '+(windTarget?'activé':'désactivé');});
+wb.addEventListener('click',function(){windTarget=windTarget?0:1;wb.textContent=windTarget?BZ.windOn:BZ.windOff;});
 fan.traverse(function(o){if(o.isMesh&&!o.material.isMeshBasicMaterial)o.castShadow=true;});
 
 var PAL={
