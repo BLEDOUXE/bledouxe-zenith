@@ -322,6 +322,15 @@
   .planet-holo[dir="rtl"] .planet-holo-title{flex-direction:row-reverse;justify-content:flex-end;}
   #destLogoWrap{transition:opacity .5s ease;}
   #destLogoWrap.gone{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .5s ease, visibility 0s linear .5s;}
+
+  /* ---- promotion : ancien prix barré au-dessus du prix actuel ---- */
+  .price-tag{top:5.2rem;}
+  .price-tag .old-price{
+    font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;
+    color:rgba(255,255,255,0.55);
+    text-decoration:line-through;text-decoration-color:#ff5a5a;text-decoration-thickness:2px;
+    margin-bottom:0.15rem;position:relative;z-index:1;
+  }
 </style>
 </head>
 <body>
@@ -374,6 +383,7 @@
   <div class="price-tag" id="priceTag">
     <div class="price-glass">
       <div class="label">Bledouxe | Zenith™ — Mini refroidisseur d'air</div>
+      <div class="old-price">20,00 €</div>
       <div class="amount">15,00 €</div>
     </div>
   </div>
